@@ -1,14 +1,19 @@
 package controllers
 
 import (
+	"encoding/json"
 	"errors"
 	"exchangeapp/global"
 	"exchangeapp/models"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis"
 	"gorm.io/gorm"
 )
+
+var cachekey = "articles"
 
 func CreatArticle(ctx *gin.Context) {
 	var article models.Article
@@ -34,20 +39,62 @@ func CreatArticle(ctx *gin.Context) {
 		return
 	}
 
+	if err := global.RedisDB.Del(cachekey).Err(); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to delete cache",
+		})
+	}
+
 	ctx.JSON(http.StatusOK, article)
 }
 
 func GetArticle(ctx *gin.Context) {
-	var articles []models.Article
 
-	if err := global.DB.Find(&articles).Error; err != nil {
+	cacheData, err := global.RedisDB.Get(cachekey).Result()
+
+	if err == redis.Nil {
+
+		var articles []models.Article
+
+		if err := global.DB.Find(&articles).Error; err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Article not found",
+			})
+			return
+		}
+
+		articleJSON, err := json.Marshal(articles)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to marshal articles",
+			})
+			return
+		}
+
+		if err := global.RedisDB.Set(cachekey, articleJSON, 10*time.Minute).Err(); err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to set cache",
+			})
+		}
+
+		ctx.JSON(http.StatusOK, articles)
+
+	} else if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Article not found",
+			"error": "Failed to get cache",
 		})
 		return
+	} else {
+		var articles []models.Article
+		if err := json.Unmarshal([]byte(cacheData), &articles); err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to unmarshal cache data",
+			})
+			return
+		}
+		ctx.JSON(http.StatusOK, articles)
 	}
 
-	ctx.JSON(http.StatusOK, articles)
 }
 
 func GetArticleById(ctx *gin.Context) {
