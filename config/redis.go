@@ -1,6 +1,7 @@
 package config
 
 import (
+	"exchangeapp/global"
 	"log"
 
 	"github.com/go-redis/redis"
@@ -19,4 +20,5 @@ func initRedis() {
 		log.Fatalf("failed to connect redis")
 	}
 
+	global.RedisDB = RedisClient
 }

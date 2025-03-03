@@ -13,8 +13,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// cachekey 定义了缓存中存储文章列表的键名
 var cachekey = "articles"
 
+// CreatArticle 处理文章创建逻辑
+// 参数: ctx *gin.Context 上下文，用于处理HTTP请求和响应
+// 该函数首先尝试解析请求体以获取文章数据，然后迁移数据库模型，最后创建文章记录并更新缓存
 func CreatArticle(ctx *gin.Context) {
 	var article models.Article
 
@@ -48,6 +52,9 @@ func CreatArticle(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, article)
 }
 
+// GetArticle 处理获取文章列表逻辑
+// 参数: ctx *gin.Context 上下文，用于处理HTTP请求和响应
+// 该函数首先尝试从缓存中获取文章列表，如果缓存未命中，则从数据库中查询并更新缓存
 func GetArticle(ctx *gin.Context) {
 
 	cacheData, err := global.RedisDB.Get(cachekey).Result()
@@ -97,6 +104,9 @@ func GetArticle(ctx *gin.Context) {
 
 }
 
+// GetArticleById 处理根据ID获取文章详情逻辑
+// 参数: ctx *gin.Context 上下文，用于处理HTTP请求和响应
+// 该函数根据提供的ID查询数据库中的文章记录，如果找到则返回文章详情，否则返回错误信息
 func GetArticleById(ctx *gin.Context) {
 	id := ctx.Param("id")
 	var article models.Article
